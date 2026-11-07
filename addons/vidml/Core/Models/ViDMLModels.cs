@@ -26,6 +26,8 @@ public class HeadDto
 
     [XmlElement("sprite")]
     public List<SpriteDto> Sprites { get; set; } = new();
+    [XmlElement("soundboard")]
+    public List<SoundboardDto> Soundboards { get; set; } = new();
 
     [XmlElement("sprite-collection")]
     public List<SpriteCollectionDto> SpriteCollections { get; set; } = new();
@@ -94,6 +96,7 @@ public class TextSettingsDto
     [XmlAttribute("text-height")] public int TextHeight{ get; set; }
     [XmlAttribute("style")] public string Style { get; set; }
     [XmlAttribute("vertical-spacing")] public int VerticalSpacing { get; set; }
+    [XmlAttribute("soundboard")] public string Soundboard { get; set; }
 }
 
 public class PhraseDto : TextSettingsDto
@@ -120,6 +123,22 @@ public class GroupDto : TextSettingsDto
 
     [XmlElement("conv")]
     public List<ConvDto> Convs { get; set; } = new();
+}
+
+public class SoundDto
+{
+    [XmlAttribute("src")] public string Src { get; set; }
+    [XmlAttribute("volume")] public float Volume { get; set; } = 0.0f; // dB offset
+}
+
+public class SoundboardDto
+{
+    [XmlAttribute("name")] public string Name { get; set; }
+    [XmlAttribute("order")] public string Order { get; set; } = "sequence"; // "sequence" or "random"
+    [XmlAttribute("ignore-spaces")] public bool IgnoreSpaces { get; set; } = true;
+
+    [XmlElement("sound")]
+    public List<SoundDto> Sounds { get; set; } = new();
 }
 
 public class BodyDto : GroupDto

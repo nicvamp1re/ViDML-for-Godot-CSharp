@@ -19,6 +19,7 @@ public partial class ViDMLManager : Node
     private readonly Dictionary<string, TextBoxDto> _textBoxes = new();
     private readonly Dictionary<string, SpriteDto> _sprites = new();
     private readonly Dictionary<string, SpriteCollectionDto> _spriteCollections = new();
+    private readonly Dictionary<string, SoundboardDto> _soundboards = new();
 
     private ViDMLDialogBox _activeDialogBox;
 
@@ -42,6 +43,7 @@ public partial class ViDMLManager : Node
         _textBoxes.Clear();
         _sprites.Clear();
         _spriteCollections.Clear();
+        _soundboards.Clear();
 
         string langPath = $"{BaseDialoguePath}/{CurrentLanguage}";
 
@@ -67,7 +69,8 @@ public partial class ViDMLManager : Node
                         _styles, 
                         _textBoxes, 
                         _sprites, 
-                        _spriteCollections
+                        _spriteCollections,
+                        _soundboards
                     );
                 }
                 fileName = dir.GetNext();
@@ -110,7 +113,8 @@ public partial class ViDMLManager : Node
                 _styles, 
                 _textBoxes, 
                 _sprites, 
-                _spriteCollections
+                _spriteCollections,
+                _soundboards
             );
             await _activeDialogBox.PlayPhraseAsync(resolvedData);
         }

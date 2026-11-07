@@ -30,8 +30,9 @@ public class ResolvedPhraseData
     public string SpriteName { get; set; }
     public string SpriteCollectionName { get; set; }
     public string EmotionName { get; set; }
+    public string SoundboardName { get; set; }
 
-    // Final Resolved Sprite Output
+    // Final Resolved Output Fields
     public string SpritePath { get; set; }
     public int SpriteWidth { get; set; }
     public int SpriteHeight { get; set; }
@@ -40,29 +41,30 @@ public class ResolvedPhraseData
     public int TextPosX { get; set; }
     public int TextPosY { get; set; }
     public int VerticalSpacing { get; set; }
-    public int TextWidth {get; set;}
-    public int TextHeight {get; set;}
+    public int TextWidth { get; set; }
+    public int TextHeight { get; set; }
+    public SoundboardDto ResolvedSoundboard { get; set; }
 }
 
 public static class StyleResolver
 {
     public static ResolvedPhraseData Resolve(
-    PhraseDto phrase, 
-    ConvDto conv, 
-    Dictionary<string, StyleDto> headStyles,
-    Dictionary<string, TextBoxDto> textBoxes,
-    Dictionary<string, SpriteDto> sprites,
-    Dictionary<string, SpriteCollectionDto> spriteCollections)
-{
-    // Clean up XML formatting whitespace and newlines from text content
-    string rawText = phrase?.TextContent ?? string.Empty;
-    string cleanedText = CleanXmlText(rawText);
-
-    var resolved = new ResolvedPhraseData
+        PhraseDto phrase, 
+        ConvDto conv, 
+        Dictionary<string, StyleDto> headStyles,
+        Dictionary<string, TextBoxDto> textBoxes,
+        Dictionary<string, SpriteDto> sprites,
+        Dictionary<string, SpriteCollectionDto> spriteCollections,
+        Dictionary<string, SoundboardDto> soundboards)
     {
-        Text = cleanedText,
-        Font = conv?.Font,
-        // ... rest of property assignments ...
+        // Clean up XML formatting whitespace and newlines from text content
+        string rawText = phrase?.TextContent ?? string.Empty;
+        string cleanedText = CleanXmlText(rawText);
+
+        var resolved = new ResolvedPhraseData
+        {
+            Text = cleanedText,
+            Font = conv?.Font,
             FontSize = conv?.FontSize ?? 14,
             Color = conv?.Color ?? "#ffffff",
             Opacity = conv?.Opacity ?? 1.0,
@@ -132,8 +134,15 @@ public static class StyleResolver
             resolved.SpriteHeight = resolvedSprite.Height;
         }
 
+        // 6. Resolve Soundboard Reference
+        if (!string.IsNullOrEmpty(resolved.SoundboardName) && soundboards != null && soundboards.TryGetValue(resolved.SoundboardName, out var sb))
+        {
+            resolved.ResolvedSoundboard = sb;
+        }
+
         return resolved;
     }
+
     /// <summary>
     /// Removes leading/trailing XML padding/newlines and normalizes indentation.
     /// </summary>
@@ -205,10 +214,12 @@ public static class StyleResolver
         if (!source.AllowManualMoveNext) target.AllowManualMoveNext = false;
         if (!string.IsNullOrEmpty(source.DialogueBox)) target.DialogueBoxName = source.DialogueBox;
 
-        // Carry forward sprite references inside ApplySettings
+        // Carry forward asset, spacing, and dimensions references
         if (!string.IsNullOrEmpty(source.Sprite)) target.SpriteName = source.Sprite;
         if (!string.IsNullOrEmpty(source.SpriteCollection)) target.SpriteCollectionName = source.SpriteCollection;
         if (!string.IsNullOrEmpty(source.Emotion)) target.EmotionName = source.Emotion;
+        if (!string.IsNullOrEmpty(source.Soundboard)) target.SoundboardName = source.Soundboard;
+
         if (source.SpritePosX != 0) target.SpritePosX = source.SpritePosX;
         if (source.SpritePosY != 0) target.SpritePosY = source.SpritePosY;
         if (source.TextPosX != 0) target.TextPosX = source.TextPosX;

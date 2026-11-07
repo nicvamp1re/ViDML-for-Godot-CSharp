@@ -2,7 +2,7 @@ using System;
 using System.Threading.Tasks;
 using Godot;
 using ViDML.Core;
-
+using ViDML.Core.Models;
 namespace ViDML.UI;
 
 public partial class ViDMLDialogBox : Control
@@ -10,10 +10,12 @@ public partial class ViDMLDialogBox : Control
     [Export] private NinePatchRect _backgroundBox;
     [Export] private TextureRect _portraitSprite;
     [Export] private RichTextLabel _textLabel;
+    [Export] private AudioStreamPlayer _audioPlayer;
 
     private bool _isPrinting = false;
     private bool _skipRequested = false;
-    private TaskCompletionSource _dialogueTcs;
+    private int _soundIndex = 0;
+    private RandomNumberGenerator _rng = new();    private TaskCompletionSource _dialogueTcs;
 
     public override void _Input(InputEvent @event)
     {
@@ -236,6 +238,47 @@ public partial class ViDMLDialogBox : Control
         }
         
         GlobalPosition = screenPos + offset;
+    }
+    private void PlayTypingSound(char currentChar, SoundboardDto soundboard)
+    {
+        if (soundboard == null || soundboard.Sounds == null || soundboard.Sounds.Count == 0)
+            return;
+
+        if (soundboard.IgnoreSpaces)
+        {
+            if (char.IsWhiteSpace(currentChar) || char.IsPunctuation(currentChar))
+                return;
+        }
+
+        SoundDto targetSound = null;
+        if (soundboard.Order?.ToLower() == "random")
+        {
+            int randomIndex = _rng.RandiRange(0, soundboard.Sounds.Count - 1);
+            targetSound = soundboard.Sounds[randomIndex];
+        }
+        else
+        {
+            targetSound = soundboard.Sounds[_soundIndex % soundboard.Sounds.Count];
+            _soundIndex++;
+        }
+
+        if (targetSound != null && !string.IsNullOrEmpty(targetSound.Src))
+        {
+            // Use the dedicated AudioLoader class here
+            var stream = AudioLoader.LoadAudioFromFile(targetSound.Src);
+            if (stream != null)
+            {
+                if (_audioPlayer == null)
+                {
+                    _audioPlayer = new AudioStreamPlayer();
+                    AddChild(_audioPlayer);
+                }
+
+                _audioPlayer.Stream = stream;
+                _audioPlayer.VolumeDb = targetSound.Volume;
+                _audioPlayer.Play();
+            }
+        }
     }
 
     private double get_process_delta_time() => (float)GetProcessDeltaTime();
