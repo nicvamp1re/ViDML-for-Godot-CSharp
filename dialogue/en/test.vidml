@@ -3,11 +3,14 @@
   <head>
     <sprite name = "icosprite" src = "res://icon.svg" width = "300" height = "250"/>
 
+    <soundboard name = "sans-soundboard">
+      <sound src = "res://dialogue/sfx/snd_txtsans.wav" />
+    </soundboard>
     <sprite-collection name = "sans" default = "default">
       <sprite name = "default"  src = "res://dialogue/images/sansundertale.png" width = "200" height = "200"/>
     </sprite-collection>
 
-    <style name="sans_text" char-speed="150" color="#FFFFFF" dialogue-box = "normal-box" sprite-collection = "sans" 
+    <style name="sans_text" char-speed="20" color="#FFFFFF" dialogue-box = "normal-box" sprite-collection = "sans" 
     sprite-pos-x="50" sprite-pos-y="40" 
     text-pos-x="300" text-pos-y="60"
     text-align = "left"
@@ -17,20 +20,28 @@
     vertical-spacing = "10"
     text-width = "800"
     text-height = "300"
+    soundboard = "sans-soundboard"
     />
     <text-box name = "normal-box" src = "res://dialogue/en/basic_window.png" width = "1200" height = "300"/>
   </head>
   <body>
     <conv uid="intro_conversation"  style = "sans_text">
       <phrase>
-        * hello, I'm [color=blue]sans[/color]
-        * sans the skeleton. And this is here to fill the box. 
-      </phrase>
-      <phrase char-speed="50" auto-move-next="true" auto-move-next-delay="2.0" >
-        This second phrase will speed up and automatically transition after 2 seconds...
+        * [color=red]Holy cow [/color]         
+        * This actually works. 
       </phrase>
       <phrase>
-        And back to normal manual navigation! Press [b]Space/Enter[/b] to finish.
+        * The sound seems alright. 
+      </phrase>
+      <phrase>
+        * It's kind of dumb that these files are actually sensitive to newlines though. 
+      </phrase>
+      <phrase>
+        * Plus, those [color=yellow]asterisks[/color] (*) were manually typed by me. 
+        Kind of ugly, ngl. 
+      </phrase>
+      <phrase>
+        * ALSO, THIS IS ALL UPPERCASE. APPARENTLY UNDERTALE'S COMIC SANS TTF ONLY HAS LOWERCASE CHARACTERS. 
       </phrase>
     </conv>
   </body>

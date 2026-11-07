@@ -3,6 +3,7 @@ using System.Threading.Tasks;
 using Godot;
 using ViDML.Core;
 using ViDML.Core.Models;
+
 namespace ViDML.UI;
 
 public partial class ViDMLDialogBox : Control
@@ -15,23 +16,33 @@ public partial class ViDMLDialogBox : Control
     private bool _isPrinting = false;
     private bool _skipRequested = false;
     private int _soundIndex = 0;
-    private RandomNumberGenerator _rng = new();    private TaskCompletionSource _dialogueTcs;
+    private readonly RandomNumberGenerator _rng = new();
+    private TaskCompletionSource _dialogueTcs;
+    private readonly RegEx _bbcodeRegex = new();
+
+    public override void _Ready()
+    {
+        // Compile regex to strip BBCode tags so typing audio syncs with visible text
+        _bbcodeRegex.Compile("\\[.*?\\]");
+        if (_textLabel != null)
+        {
+            _textLabel.BbcodeEnabled = true;
+        }
+    }
 
     public override void _Input(InputEvent @event)
     {
-        // Allow manual skip when player presses the accept action (e.g., Space, Enter, Return)
         if (@event.IsActionPressed("ui_accept") && _isPrinting)
         {
             _skipRequested = true;
         }
         else if (@event.IsActionPressed("ui_accept") && !_isPrinting && _dialogueTcs != null)
         {
-            // Complete current phrase waiting on input
             _dialogueTcs.TrySetResult();
         }
     }
     
-        private void ApplyTextStyles(ResolvedPhraseData data)
+    private void ApplyTextStyles(ResolvedPhraseData data)
     {
         if (_textLabel == null) return;
 
@@ -39,11 +50,8 @@ public partial class ViDMLDialogBox : Control
         Color textColor = Colors.White;
         if (!string.IsNullOrEmpty(data.Color))
         {
-            // Safely parses HTML hex codes (e.g., "#00ffcc") or named colors with a fallback
             textColor = Color.FromString(data.Color, Colors.White);
         }
-        
-        // Apply opacity to the alpha channel
         textColor.A = (float)data.Opacity;
         _textLabel.AddThemeColorOverride("default_color", textColor);
 
@@ -62,33 +70,34 @@ public partial class ViDMLDialogBox : Control
                 _textLabel.AddThemeFontOverride("normal_font", fontResource);
             }
         }
-        //_backgroundBox.CustomMaximumSize = new Vector2(data.BoxWidth, data.BoxHeight);
 
-        // 4. Text Alignment Mapping
+        // 4. Text Alignment
         _textLabel.HorizontalAlignment = data.TextAlign?.ToLower() switch
         {
             "center" => HorizontalAlignment.Center,
             "right" or "end" => HorizontalAlignment.Right,
             "fill" or "justify" => HorizontalAlignment.Fill,
-            _ => HorizontalAlignment.Left // "start" or default maps to Left
+            _ => HorizontalAlignment.Left
         };
+        
         _textLabel.AddThemeConstantOverride("line_separation", data.VerticalSpacing);
     }
+
     /// <summary>
-    /// Plays a resolved phrase, managing typewriter speed and UI elements.
+    /// Plays a resolved phrase, managing typewriter speed, BBCode, audio, and UI elements.
     /// </summary>
     public async Task PlayPhraseAsync(ResolvedPhraseData data)
     {
         Visible = true;
         _skipRequested = false;
-        // 1. Apply Dynamic Width and Height from ViDML <text-box> definition
+
+        // 1. Configure Background Box Size & Texture
         if (data.BoxWidth > 0 && data.BoxHeight > 0)
         {
             CustomMinimumSize = new Vector2(data.BoxWidth, data.BoxHeight);
             Size = CustomMinimumSize;
         }
 
-        // 2. Configure Background Texture
         if (!string.IsNullOrEmpty(data.DialogueBoxPath))
         {
             var texture = TextureLoader.LoadTextureFromFile(data.DialogueBoxPath);
@@ -97,84 +106,82 @@ public partial class ViDMLDialogBox : Control
                 _backgroundBox.Texture = texture;
             }
         }
+
+        // 2. Apply Text Styles, Position & Size
         ApplyTextStyles(data);
-        _textLabel.Size = new Vector2(data.TextWidth, data.TextHeight);
 
-    // 3. Configure Portrait Sprite & Position
-    if (_portraitSprite != null)
-    {
-        if (!string.IsNullOrEmpty(data.SpritePath))
+        if (_textLabel != null)
         {
-            var spriteTex = TextureLoader.LoadTextureFromFile(data.SpritePath);
-            _portraitSprite.Texture = spriteTex;
-            _portraitSprite.Visible = spriteTex != null;
+            _textLabel.Position = new Vector2(data.TextPosX, data.TextPosY);
+            _textLabel.CustomMinimumSize = new Vector2(data.TextWidth, data.TextHeight);
+            _textLabel.Size = _textLabel.CustomMinimumSize;
+        }
 
-            if (data.SpriteWidth > 0 && data.SpriteHeight > 0)
+        // 3. Configure Portrait Sprite & Position
+        if (_portraitSprite != null)
+        {
+            if (!string.IsNullOrEmpty(data.SpritePath))
             {
-                _portraitSprite.CustomMinimumSize = new Vector2(data.SpriteWidth, data.SpriteHeight);
+                var spriteTex = TextureLoader.LoadTextureFromFile(data.SpritePath);
+                _portraitSprite.Texture = spriteTex;
+                _portraitSprite.Visible = spriteTex != null;
+
+                if (data.SpriteWidth > 0 && data.SpriteHeight > 0)
+                {
+                    _portraitSprite.CustomMinimumSize = new Vector2(data.SpriteWidth, data.SpriteHeight);
+                }
+
+                _portraitSprite.Position = new Vector2(data.SpritePosX, data.SpritePosY);
             }
-
-            // Apply custom X/Y coordinates defined in style/phrase
-            _portraitSprite.Position = new Vector2(data.SpritePosX, data.SpritePosY);
-        }
-        else
-        {
-            _portraitSprite.Visible = false;
-        }
-    }
-
-    // 4. Configure Text Position & Size
-    if (_textLabel != null)
-    {
-        _textLabel.Position = new Vector2(data.TextPosX, data.TextPosY);
-        
-        // Optional: If you want text width/height to be bound inside the box bounds, 
-        // you can adjust its size or anchors here as well.
-    }
-        // 1. Configure Background Box Texture & Dimensions if provided
-        if (!string.IsNullOrEmpty(data.DialogueBoxPath))
-        {
-            var texture = TextureLoader.LoadTextureFromFile(data.DialogueBoxPath);
-            if (texture != null && _backgroundBox != null)
+            else
             {
-                _backgroundBox.Texture = texture;
+                _portraitSprite.Visible = false;
             }
         }
 
-        // 3. Set Text & BBCode
+        // 4. Set Text & Run Typewriter Effect with BBCode & Audio Support
         if (_textLabel != null)
         {
             _textLabel.Text = data.Text ?? string.Empty;
             _textLabel.VisibleCharacters = 0;
 
-            int totalCharacters = _textLabel.GetTotalCharacterCount();
+            // Strip BBCode tags to find true visible character length for the sound trigger
+            string plainText = _bbcodeRegex.Sub(_textLabel.Text, "", true);
+            int totalCharacters = plainText.Length;
             if (totalCharacters == 0) totalCharacters = 1;
 
             _isPrinting = true;
 
             if (data.InstantCharacters)
             {
-                _textLabel.VisibleCharacters = totalCharacters;
+                _textLabel.VisibleCharacters = -1; // -1 reveals all characters in Godot RichTextLabel
             }
             else
             {
-                // Typewriter loop
-                double charInterval = 1.0 / data.CharSpeed;
+                double charInterval = data.CharSpeed > 0 ? (1.0 / data.CharSpeed) : 0.03;
                 double timer = 0.0;
 
                 while (_textLabel.VisibleCharacters < totalCharacters)
                 {
                     if (_skipRequested && data.AllowManualSkip)
                     {
-                        _textLabel.VisibleCharacters = totalCharacters;
+                        _textLabel.VisibleCharacters = -1;
                         break;
                     }
 
-                    timer += get_process_delta_time();
+                    timer += GetProcessDeltaTime();
                     if (timer >= charInterval)
                     {
                         timer = 0;
+                        int prevVisible = _textLabel.VisibleCharacters;
                         _textLabel.VisibleCharacters += 1;
+
+                        // Play typing sound for the newly revealed plain-text character
+                        if (_textLabel.VisibleCharacters > prevVisible && prevVisible >= 0 && prevVisible < plainText.Length)
+                        {
+                            char revealedChar = plainText[prevVisible];
+                            PlayTypingSound(revealedChar, data.ResolvedSoundboard);
+                        }
                     }
 
                     await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
@@ -184,7 +191,7 @@ public partial class ViDMLDialogBox : Control
             _isPrinting = false;
         }
 
-        // 4. Handle Auto-Advance or Wait for Player Input
+        // 5. Handle Auto-Advance or Wait for Player Input
         _dialogueTcs = new TaskCompletionSource();
 
         if (data.AutoMoveNext)
@@ -193,45 +200,30 @@ public partial class ViDMLDialogBox : Control
             {
                 await ToSignal(GetTree().CreateTimer(data.AutoMoveNextDelay), SceneTreeTimer.SignalName.Timeout);
             }
-            else
-            {
-                // Instant auto-advance if delay is 0
-                await Task.CompletedTask;
-            }
         }
         else if (data.AllowManualMoveNext)
         {
-            // Wait until user presses ui_accept again
             await _dialogueTcs.Task;
         }
         else
         {
-            // Fallback short pause if manual movement is disallowed
             await ToSignal(GetTree().CreateTimer(1.5), SceneTreeTimer.SignalName.Timeout);
         }
 
         _dialogueTcs = null;
     }
-    /// <summary>
-    /// Positions the dialogue box in screen space.
-    /// </summary>
+
     public void SetPosition(Vector2 globalPosition)
     {
         GlobalPosition = globalPosition;
     }
 
-    /// <summary>
-    /// Anchors the dialogue box centered relative to a target Node2D (e.g. an NPC),
-    /// offset vertically by a given height.
-    /// </summary>
     public void AttachToNode(Node2D targetNode, Vector2 offset = default)
     {
         if (targetNode == null) return;
         
-        // Convert target node's global transform to screen position
         Vector2 screenPos = targetNode.GetGlobalTransformWithCanvas().Origin;
         
-        // Default offset: center box horizontally over node and place it slightly above
         if (offset == Vector2.Zero)
         {
             offset = new Vector2(-Size.X / 2f, -Size.Y - 20f);
@@ -239,6 +231,7 @@ public partial class ViDMLDialogBox : Control
         
         GlobalPosition = screenPos + offset;
     }
+
     private void PlayTypingSound(char currentChar, SoundboardDto soundboard)
     {
         if (soundboard == null || soundboard.Sounds == null || soundboard.Sounds.Count == 0)
@@ -264,7 +257,6 @@ public partial class ViDMLDialogBox : Control
 
         if (targetSound != null && !string.IsNullOrEmpty(targetSound.Src))
         {
-            // Use the dedicated AudioLoader class here
             var stream = AudioLoader.LoadAudioFromFile(targetSound.Src);
             if (stream != null)
             {
@@ -280,6 +272,4 @@ public partial class ViDMLDialogBox : Control
             }
         }
     }
-
-    private double get_process_delta_time() => (float)GetProcessDeltaTime();
 }
