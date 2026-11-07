@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vidml xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <head>
+    <sprite name = "icosprite" src = "res://icon.svg" width = "300" height = "250"/>
+
+    <sprite-collection name = "sans" default = "default">
+      <sprite name = "default"  src = "res://dialogue/images/sansundertale.png" width = "200" height = "200"/>
+    </sprite-collection>
+
+    <style name="sans_text" char-speed="150" color="#FFFFFF" dialogue-box = "normal-box" sprite-collection = "sans" 
+    sprite-pos-x="50" sprite-pos-y="40" 
+    text-pos-x="300" text-pos-y="60"
+    text-align = "left"
+    opacity = "1"
+    font-size = "50"
+    font = "res://dialogue/en/fonts/Comic Sans.ttf"
+    vertical-spacing = "10"
+    text-width = "800"
+    text-height = "300"
+    />
+    <text-box name = "normal-box" src = "res://dialogue/en/basic_window.png" width = "1200" height = "300"/>
+  </head>
+  <body>
+    <conv uid="intro_conversation"  style = "sans_text">
+      <phrase>
+        * hello, I'm [color=blue]sans[/color]
+        * sans the skeleton. And this is here to fill the box. 
+      </phrase>
+      <phrase char-speed="50" auto-move-next="true" auto-move-next-delay="2.0" >
+        This second phrase will speed up and automatically transition after 2 seconds...
+      </phrase>
+      <phrase>
+        And back to normal manual navigation! Press [b]Space/Enter[/b] to finish.
+      </phrase>
+    </conv>
+  </body>
+</vidml>

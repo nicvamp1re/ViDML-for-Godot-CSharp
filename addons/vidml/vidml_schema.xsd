@@ -1,0 +1,292 @@
+<?xml version="1.0"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
+<!--THIS IS DEPRICATED. This schema was initially used to markup the overall syntax of the early version. However, in the actual realisation, C#'s 
+XML library is used to define the syntax instead. -->
+
+
+<!--This XML schema describes the syntax rules for ViDML, which is short for Videogame Dialogue Markup Language. 
+ViDML files are supposed to contain the videogame text and all of the information on how it's supposed to look like in the game, including
+some elements like sprites or text boxes that work as a background of the text.-->
+
+<!--Global type for text settings, defined within attributes. All text-containing tags starting from <body> inherit this type via the phrase-settings type. 
+However, tags within ph tags for text editing inherit this type directly-->
+<xs:complexType name="text-settings">
+
+    <!--Fonts are to be defined and imported within the respective tag within the head tag-->
+    <xs:attribute name="font" type="xs:string"></xs:attribute>
+
+    <!--TODO: reconsider how font size is implemented. Will there be problems with different resolutions? We'll have to wait and see-->
+    <xs:attribute name="font-size" type="xs:int" default="14"></xs:attribute>
+
+    <!--Text color is specified here. Default is white, or #ffffff. Written as a hexadecimal -->
+    <xs:attribute name="color" default="#ffffff">
+        <xs:simpleType>
+            <xs:restriction base="xs:string">
+            <xs:pattern value="#[0-9a-fA-F]{6}"/>
+            </xs:restriction>
+        </xs:simpleType>
+    </xs:attribute>
+
+    <!-- Defines opacity 1.0 is opaque, 0 is fully transparent, -->
+    <xs:attribute name="opacity" default="1.0">
+        <xs:simpleType>
+            <xs:restriction base="xs:double" >
+                <xs:minInclusive value="0"></xs:minInclusive>
+                <xs:maxInclusive value="1.0"></xs:maxInclusive>
+            </xs:restriction>
+        </xs:simpleType>
+    </xs:attribute>
+
+    <!--Defines how many characters appear per second. It's apparently 30 for Undertale, so that's the default here-->
+    <xs:attribute name="char-speed" default="30">
+        <xs:simpleType>
+            <xs:restriction base="xs:double">
+                <xs:minExclusive value="0"></xs:minExclusive>
+            </xs:restriction>
+        </xs:simpleType>
+    </xs:attribute>
+
+    <!--If this is set to "true", all characters within the given block will appear instantly, ignoring the char-speed value-->
+    <xs:attribute name="instant-characters" type="xs:boolean" default="false"></xs:attribute>
+
+</xs:complexType>
+
+<!--This defines pretty much all of the settings for windows (phrases). Used by the body tag and all of its child tags.-->
+<xs:complexType name="phrase-settings">
+    <xs:complexContent>
+        <xs:extension base="text-settings">
+            <!--How many lines the window can have. Defaults to 3, since that's what it is in Undertale. -->
+            <xs:attribute name="max-line-amount" type="xs:int" default="3"></xs:attribute>
+
+            <!--New lines have in Undertale dialogue windows have a * symbol on the left. 
+            This makes some text a bit easier to read, but here it's optional. Leaving this empty makes
+            nothing like this appear in the first place-->
+            <xs:attribute name="new-line-symbol" type="xs:string" default=""></xs:attribute>
+
+            <!--Defines in which order the letters appear. left-to-right is the default since that's how most languages are written, 
+            but for arabic and other languages, that can be changed-->
+            <xs:attribute name="text-direction" default="left-to-right">
+                <xs:simpleType>
+                    <xs:restriction base="xs:string">
+                        <xs:enumeration value="left-to-right"></xs:enumeration>
+                        <xs:enumeration value="right-to-left"></xs:enumeration>
+                    </xs:restriction>
+                </xs:simpleType>
+            </xs:attribute>
+
+            <!--Specifies how the text is aligned. -->
+            <xs:attribute name="text-align" default="left">
+                <xs:simpleType>
+                    <xs:restriction base="xs:string">
+                        <xs:enumeration value="left"></xs:enumeration>
+                        <xs:enumeration value="right"></xs:enumeration>
+                        <xs:enumeration value="center"></xs:enumeration>
+                        <xs:enumeration value="fill"></xs:enumeration>
+                    </xs:restriction>
+                </xs:simpleType>
+            </xs:attribute>
+            
+            <!--If set to "True", then after the text has finished printing, the dialogue window will terminate, switching to the next 
+            phrase within the conv tag, or if that's not applicable - disappear after a period of time specified within the 
+            auto-move-next-delay attribute. By default, that is set to zero, which means that the text will disappear the second
+            it finished printing (akin to Alphys dumping a wall of text on her favorite anime in Undertale).
+            -->
+            <xs:attribute name="auto-move-next" type="xs:boolean" default="false"></xs:attribute>
+
+            <xs:attribute name="auto-move-next-delay" default="0">
+                <xs:simpleType>
+                    <xs:restriction base="xs:double">
+                        <xs:minInclusive value="0"></xs:minInclusive>
+                    </xs:restriction>
+                </xs:simpleType>
+            </xs:attribute>
+            
+            <!--If true, pressing a button (or buttons) specified via the engine while the text is still being printed will cause 
+            all of it to be printed instantly. True by default. -->
+            <xs:attribute name="allow-manual-skip" type="xs:boolean" default="true"></xs:attribute>
+
+            <!--If true, pressing a button after the text has finished printing, the dialogue window will terminate or go to 
+            the next phrase if a specific button defined within the engine
+            is pressed. Compatible with the auto-move-next attribute, which allows the text to go to the next phrase either
+            when a set amount of time has passed, or when the player presses a button. This defaults to true and should be 
+            disabled only if you don't want the player to be able to move to the next phrase manually. -->
+            <xs:attribute name="allow-manual-move-next" type="xs:boolean" default="true"></xs:attribute>
+            
+            <!--Refenences the visual box, that is described within the head tag. -->
+            <xs:attribute name="dialogue-box" type="xs:string"></xs:attribute>
+
+            <!--Now this is complicated. This references a sprite defined within the head tag, where they can be grouped. 
+            TODO: define the format for that
+            If left unspecified, than it assumes that there is no sprite to display, which may affect how much space there is for the text-->
+            <xs:attribute name="sprite" type="xs:string"></xs:attribute>
+
+            <!--Allows to use a style, defined within the head tag. Style tags inherit this type. 
+            Specifying attribute values further overwrites the values of those attributes, defined within the style
+            Be vary of recursions, as referencing itself, or a style that references this style can cause an infinite loop
+            (if I'm not cautions, of course)-->
+            <xs:attribute name="style" type="xs:string"></xs:attribute>
+        </xs:extension>
+    </xs:complexContent>
+</xs:complexType>
+
+
+<!--The phrase type. Defined here so that its unique id can be optional within the conv tags but required everywhere else
+A phrase is a short instance of text, that is usually supposed to be fully displayed on a screen after it has finished printing. 
+Typically, only one phrase is shown on the screen at a time, and when we want to show a new phrase, the previous one must disappear.
+That does, however, depend on the context. In Undertale, for example, multiple text bubbles from multiple characters can exist 
+simultaneously. But for a typical RPG, the piece of text that fully fits in the text box and IS displayed this way corresponds to one
+ViDML phrase.
+-->
+<xs:complexType name="phrase-type" mixed="true">
+    <xs:complexContent>
+        <xs:extension base="phrase-settings">
+            <xs:choice minOccurs="0" maxOccurs="unbounded">
+                
+                <!--Defines a pause of the printing of the text.-->
+                <xs:element name="pause">
+                    <xs:complexType>
+                        <xs:attribute name="duration" type="xs:positiveInteger" use="required"></xs:attribute>
+                    </xs:complexType>
+                </xs:element>
+
+                <!--A tag that allows formating within a phrase, like highlighting a specific word in yellow or making it bigger. I am
+                being very liberal here by leaving the whole scope of text settings at one's disposal here, since some of these may break my code
+                TODO: reconsider this later after implementation.-->
+                <xs:element name="text">
+                    <xs:complexType mixed="true">
+                        <xs:complexContent>
+                            <xs:extension base="text-settings"></xs:extension>
+                        </xs:complexContent>
+                    </xs:complexType>
+                </xs:element>
+            </xs:choice>
+        </xs:extension>
+    </xs:complexContent>
+</xs:complexType>
+
+<!--Conv is short for Conversation and is intended to contain several phrases that are played CONSEQUTIVELY, in a specific order, 
+without any interruption, from start to finish. This actually means that someone who has access to a ViDML file can change the amount
+of phrases within a conversation, for example, if an explanation of something in the original text fits in just 3 phrases, but 
+when translating to a different language is best explained in 4 or more phrases due to the language nuances. 
+Convs must have uids that are used in the code to summon and print them.
+-->
+<xs:complexType name="conv-type">
+    <xs:complexContent>
+        <xs:extension base="phrase-settings">
+            <xs:sequence>
+                <!--Convs only contain phrases. The uids in phrases contained within convs are optional, since they are usually 
+                intended to be accessed via the uid of the conv they're in. I allow the usage of uids here for really specific cases-->
+                <xs:element name="phrase" maxOccurs="unbounded">
+                    <xs:complexType>
+                        <xs:complexContent>
+                            <xs:extension base="phrase-type">
+                                <xs:attribute name="uid" type="xs:string" use="optional"></xs:attribute>
+                            </xs:extension>
+                        </xs:complexContent>
+                    </xs:complexType>
+                </xs:element>
+            </xs:sequence>
+            <xs:attribute name="uid" type="xs:string" use="required"></xs:attribute>
+        </xs:extension>
+    </xs:complexContent>
+</xs:complexType>
+
+<!--Group type, used by group tags. Used for applying a specific style to all of the child elements, including other group tags.
+The body tag also uses this type. I thought of giving the groups a name attribute, so that you could access convs and phrases 
+through a hierarchy of groups and names but decided that this wouldn't make a lot of sense. with uids already fulfilling this function-->
+<xs:complexType name="group-type">
+    <xs:complexContent>
+        <xs:extension base="phrase-settings">
+            <xs:choice minOccurs="0" maxOccurs="unbounded">
+                <xs:element name="group" type ="group-type"></xs:element>
+                <xs:element name="phrase">
+                    <xs:complexType>
+                        <xs:complexContent>
+                            <xs:extension base="phrase-type">
+                                <xs:attribute name="uid" type="xs:string" use="required"></xs:attribute>
+                            </xs:extension>
+                        </xs:complexContent>
+                    </xs:complexType>
+                </xs:element>
+                <xs:element name="conv" type="conv-type"></xs:element>
+            </xs:choice>
+        </xs:extension>
+    </xs:complexContent>
+</xs:complexType>
+
+<xs:element name="vidml">
+    <xs:complexType>
+        <xs:sequence>
+            <!--Head tag contains the settings for the project, and pre-defines some things like dialogue windows, imported files and styles-->
+            <xs:element name="head">
+                <xs:complexType>
+                    <xs:choice maxOccurs="unbounded">
+
+                        <!--Allows to import settings from another file. Note, that this only imports the contents 
+                        of the head tag in the source file, completely ignoring what is in the body tag. Be vary of name conflicts-->
+                        <xs:element name="import">
+                            <xs:complexType>
+                                <xs:attribute name="src" type="xs:string"></xs:attribute>
+                            </xs:complexType>
+                        </xs:element>
+
+                        <!--Defines a style for text and window that can import other styles as well. Must be given a unique name-->
+                        <xs:element name="style">
+                            <xs:complexType>
+                                <xs:complexContent>
+                                    <xs:extension base="phrase-settings">
+                                        <xs:attribute name="name" type="xs:string" use="required"></xs:attribute>
+                                    </xs:extension>
+                                </xs:complexContent>
+                            </xs:complexType>
+                        </xs:element>
+
+                        <!--TODO: Extend the functionality of this. But for now, let it just use the imported file-->
+                        <xs:element name="text-box">
+                            <xs:complexType>
+                                <xs:attribute name="name" type="xs:string" use="required"></xs:attribute>
+                                <xs:attribute name="src" type="xs:string"></xs:attribute>
+                                <xs:attribute name="height" type="xs:int"></xs:attribute>
+                                <xs:attribute name="width" type="xs:int"></xs:attribute>
+                            </xs:complexType>
+                        </xs:element>
+
+                        <!--TODO: Improve this. This is extremely crude. But for the initial prototype, leave this as it is-->
+                        <xs:element name="sprite">
+                            <xs:complexType>
+                                <xs:attribute name="src" type="xs:string"></xs:attribute>
+                            </xs:complexType>
+                        </xs:element>
+                    </xs:choice>
+                </xs:complexType>
+                <!--This is where the attributes are set to be unique-->
+                <xs:unique name="unique-style-id">
+                    <xs:selector xpath="style"></xs:selector>
+                    <xs:field xpath="@name"></xs:field>
+                </xs:unique>
+                <xs:unique name="unique-text-box-id">
+                    <xs:selector xpath="text-box"></xs:selector>
+                    <xs:field xpath="@name"></xs:field>
+                </xs:unique>
+
+            </xs:element>
+            
+            <!--Body tag contains all the text that is printed. Go to lines 129-209 to see what it is supposed to contain-->
+            <xs:element name="body">
+                <xs:complexType>
+                    <xs:complexContent>
+                        <xs:extension base="group-type"></xs:extension>
+                    </xs:complexContent>
+                </xs:complexType>
+                <!--Ensures that convs and phrases don't have matching uids, no matter where they are within the body tag.
+                Uids use the string type, so that one can come up with some id conventions for convenience when needed-->
+                <xs:unique name="unique-printable-uid">
+                    <xs:selector xpath=".//conv | .//phrase" />
+                    <xs:field xpath="@uid" />
+                </xs:unique>
+            </xs:element>
+        </xs:sequence>
+    </xs:complexType>
+</xs:element>
+
+</xs:schema>

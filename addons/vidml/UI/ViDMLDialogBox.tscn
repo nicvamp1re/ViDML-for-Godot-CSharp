@@ -1,0 +1,37 @@
+[gd_scene format=3 uid="uid://bicbemrmgsa2q"]
+
+[ext_resource type="Script" uid="uid://6qygkdewpp18" path="res://addons/vidml/UI/ViDMLDialogBox.cs" id="1_voi52"]
+
+[node name="ViDMLDialogBox" type="Control" unique_id=224103030 node_paths=PackedStringArray("_backgroundBox", "_portraitSprite", "_textLabel")]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_voi52")
+_backgroundBox = NodePath("BackgroundBox")
+_portraitSprite = NodePath("PortraitSprite")
+_textLabel = NodePath("DialogueText")
+
+[node name="BackgroundBox" type="NinePatchRect" parent="." unique_id=142441771]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="PortraitSprite" type="TextureRect" parent="." unique_id=1408887390]
+layout_mode = 0
+offset_right = 100.0
+offset_bottom = 100.0
+expand_mode = 1
+stretch_mode = 5
+
+[node name="DialogueText" type="RichTextLabel" parent="." unique_id=1523845785]
+layout_mode = 0
+offset_right = 600.0
+offset_bottom = 200.0
+bbcode_enabled = true
+visible_characters_behavior = 1

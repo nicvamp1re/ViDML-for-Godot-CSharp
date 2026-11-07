@@ -1,0 +1,8 @@
+[gd_scene format=3 uid="uid://dnf84iw04qmq"]
+
+[ext_resource type="Script" uid="uid://bkqk6qy41sjqw" path="res://addons/vidml/Core/ViDMLManager.cs" id="1_tly0r"]
+[ext_resource type="PackedScene" uid="uid://bicbemrmgsa2q" path="res://addons/vidml/UI/ViDMLDialogBox.tscn" id="2_8ruwx"]
+
+[node name="ViDMLManager" type="Node" unique_id=1194156475]
+script = ExtResource("1_tly0r")
+DefaultDialogBoxScene = ExtResource("2_8ruwx")
