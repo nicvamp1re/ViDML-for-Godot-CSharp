@@ -16,7 +16,8 @@ public static class ViDMLParser
         Dictionary<string, TextBoxDto> textBoxRegistry,
         Dictionary<string, SpriteDto> spriteRegistry,
         Dictionary<string, SpriteCollectionDto> spriteCollectionRegistry,
-        Dictionary<string, SoundboardDto> soundboardRegistry)
+        Dictionary<string, SoundboardDto> soundboardRegistry,
+        Dictionary<string, SfxDto> sfxRegistry)
         
     {
         if (!Godot.FileAccess.FileExists(filePath))
@@ -79,6 +80,14 @@ public static class ViDMLParser
                     {
                         if (!string.IsNullOrEmpty(sb.Name)) 
                             soundboardRegistry[sb.Name] = sb;
+                    }
+                }
+                if (root.Head.SoundEffects != null)
+                {
+                    foreach (var sfx in root.Head.SoundEffects)
+                    {
+                        if (!string.IsNullOrEmpty(sfx.Name)) 
+                            sfxRegistry[sfx.Name] = sfx;
                     }
                 }
             }

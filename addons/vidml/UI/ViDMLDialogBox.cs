@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Godot;
 using ViDML.Core;
@@ -11,22 +13,34 @@ public partial class ViDMLDialogBox : Control
     [Export] private NinePatchRect _backgroundBox;
     [Export] private TextureRect _portraitSprite;
     [Export] private RichTextLabel _textLabel;
-    [Export] private AudioStreamPlayer _audioPlayer;
+    [Export] private AudioStreamPlayer _audioPlayer;      // Typing soundboard player
+    [Export] private AudioStreamPlayer _sfxAudioPlayer;   // One-shot SFX player
 
     private bool _isPrinting = false;
     private bool _skipRequested = false;
     private int _soundIndex = 0;
     private readonly RandomNumberGenerator _rng = new();
     private TaskCompletionSource _dialogueTcs;
+    
+    // Robust RegEx pattern matching [pause="0.5"], [pause="0.5" sfx="boom"], [sfx name="boom"], etc.
     private readonly RegEx _bbcodeRegex = new();
+    private static readonly System.Text.RegularExpressions.Regex _inlineTagRegex = new(
+        @"\[\s*(pause|sfx)([^\]]*?)\]", 
+        RegexOptions.IgnoreCase | RegexOptions.Compiled
+    );
 
     public override void _Ready()
     {
-        // Compile regex to strip BBCode tags so typing audio syncs with visible text
         _bbcodeRegex.Compile("\\[.*?\\]");
         if (_textLabel != null)
         {
             _textLabel.BbcodeEnabled = true;
+        }
+
+        if (_sfxAudioPlayer == null)
+        {
+            _sfxAudioPlayer = new AudioStreamPlayer();
+            AddChild(_sfxAudioPlayer);
         }
     }
 
@@ -41,12 +55,30 @@ public partial class ViDMLDialogBox : Control
             _dialogueTcs.TrySetResult();
         }
     }
-    
+    /// <summary>
+    /// Anchors the dialogue box centered relative to a target Node2D (e.g. an NPC),
+    /// offset vertically by a given height.
+    /// </summary>
+    public void AttachToNode(Node2D targetNode, Vector2 offset = default)
+    {
+        if (targetNode == null) return;
+        
+        // Convert target node's global transform to screen position
+        Vector2 screenPos = targetNode.GetGlobalTransformWithCanvas().Origin;
+        
+        // Default offset: center box horizontally over node and place it slightly above
+        if (offset == Vector2.Zero)
+        {
+            offset = new Vector2(-Size.X / 2f, -Size.Y - 20f);
+        }
+        
+        GlobalPosition = screenPos + offset;
+    }
+
     private void ApplyTextStyles(ResolvedPhraseData data)
     {
         if (_textLabel == null) return;
 
-        // 1. Color & Opacity
         Color textColor = Colors.White;
         if (!string.IsNullOrEmpty(data.Color))
         {
@@ -55,13 +87,11 @@ public partial class ViDMLDialogBox : Control
         textColor.A = (float)data.Opacity;
         _textLabel.AddThemeColorOverride("default_color", textColor);
 
-        // 2. Font Size
         if (data.FontSize > 0)
         {
             _textLabel.AddThemeFontSizeOverride("normal_font_size", data.FontSize);
         }
 
-        // 3. Custom Font Loading
         if (!string.IsNullOrEmpty(data.Font))
         {
             var fontResource = TextureLoader.LoadFontFromFile(data.Font);
@@ -71,7 +101,6 @@ public partial class ViDMLDialogBox : Control
             }
         }
 
-        // 4. Text Alignment
         _textLabel.HorizontalAlignment = data.TextAlign?.ToLower() switch
         {
             "center" => HorizontalAlignment.Center,
@@ -83,15 +112,11 @@ public partial class ViDMLDialogBox : Control
         _textLabel.AddThemeConstantOverride("line_separation", data.VerticalSpacing);
     }
 
-    /// <summary>
-    /// Plays a resolved phrase, managing typewriter speed, BBCode, audio, and UI elements.
-    /// </summary>
     public async Task PlayPhraseAsync(ResolvedPhraseData data)
     {
         Visible = true;
         _skipRequested = false;
 
-        // 1. Configure Background Box Size & Texture
         if (data.BoxWidth > 0 && data.BoxHeight > 0)
         {
             CustomMinimumSize = new Vector2(data.BoxWidth, data.BoxHeight);
@@ -107,7 +132,6 @@ public partial class ViDMLDialogBox : Control
             }
         }
 
-        // 2. Apply Text Styles, Position & Size
         ApplyTextStyles(data);
 
         if (_textLabel != null)
@@ -117,7 +141,6 @@ public partial class ViDMLDialogBox : Control
             _textLabel.Size = _textLabel.CustomMinimumSize;
         }
 
-        // 3. Configure Portrait Sprite & Position
         if (_portraitSprite != null)
         {
             if (!string.IsNullOrEmpty(data.SpritePath))
@@ -139,13 +162,15 @@ public partial class ViDMLDialogBox : Control
             }
         }
 
-        // 4. Set Text & Run Typewriter Effect with BBCode & Audio Support
         if (_textLabel != null)
         {
-            _textLabel.Text = data.Text ?? string.Empty;
+            // Parse and strip custom [pause] and [sfx] tags, building the event timeline
+            string rawText = data.Text ?? string.Empty;
+            string cleanBbcodeText = ParseInlineEvents(rawText, data.HeadSfxRegistry, out var eventTimeline);
+
+            _textLabel.Text = cleanBbcodeText;
             _textLabel.VisibleCharacters = 0;
 
-            // Strip BBCode tags to find true visible character length for the sound trigger
             string plainText = _bbcodeRegex.Sub(_textLabel.Text, "", true);
             int totalCharacters = plainText.Length;
             if (totalCharacters == 0) totalCharacters = 1;
@@ -154,7 +179,7 @@ public partial class ViDMLDialogBox : Control
 
             if (data.InstantCharacters)
             {
-                _textLabel.VisibleCharacters = -1; // -1 reveals all characters in Godot RichTextLabel
+                _textLabel.VisibleCharacters = -1;
             }
             else
             {
@@ -176,7 +201,23 @@ public partial class ViDMLDialogBox : Control
                         int prevVisible = _textLabel.VisibleCharacters;
                         _textLabel.VisibleCharacters += 1;
 
-                        // Play typing sound for the newly revealed plain-text character
+                        int charIndex = _textLabel.VisibleCharacters - 1;
+
+                        // 1. Trigger any inline SFX or Pause events attached to this character index
+                        if (eventTimeline.TryGetValue(charIndex, out var eventsAtChar))
+                        {
+                            foreach (var inlineEvt in eventsAtChar)
+                            {
+                                PlayOneShotSfx(inlineEvt);
+
+                                if (inlineEvt.PauseDuration > 0 && !_skipRequested)
+                                {
+                                    await ToSignal(GetTree().CreateTimer(inlineEvt.PauseDuration), SceneTreeTimer.SignalName.Timeout);
+                                }
+                            }
+                        }
+
+                        // 2. Play standard typing soundboard for visible character
                         if (_textLabel.VisibleCharacters > prevVisible && prevVisible >= 0 && prevVisible < plainText.Length)
                         {
                             char revealedChar = plainText[prevVisible];
@@ -191,7 +232,6 @@ public partial class ViDMLDialogBox : Control
             _isPrinting = false;
         }
 
-        // 5. Handle Auto-Advance or Wait for Player Input
         _dialogueTcs = new TaskCompletionSource();
 
         if (data.AutoMoveNext)
@@ -213,23 +253,109 @@ public partial class ViDMLDialogBox : Control
         _dialogueTcs = null;
     }
 
-    public void SetPosition(Vector2 globalPosition)
+    /// <summary>
+    /// Strips [pause] and [sfx] tags from text and populates a character-indexed event timeline.
+    /// </summary>
+    private string ParseInlineEvents(
+        string rawText, 
+        Dictionary<string, SfxDto> sfxRegistry, 
+        out Dictionary<int, List<InlineEvent>> timeline)
     {
-        GlobalPosition = globalPosition;
+        timeline = new Dictionary<int, List<InlineEvent>>();
+        if (string.IsNullOrEmpty(rawText)) return string.Empty;
+
+        var matches = _inlineTagRegex.Matches(rawText);
+        if (matches.Count == 0) return rawText;
+
+        var sb = new System.Text.StringBuilder();
+        int lastIndex = 0;
+        int currentPlainIndex = 0;
+
+        foreach (System.Text.RegularExpressions.Match match in matches)
+        {
+            string textChunk = rawText.Substring(lastIndex, match.Index - lastIndex);
+            sb.Append(textChunk);
+
+            string plainChunk = _bbcodeRegex.Sub(textChunk, "", true);
+            currentPlainIndex += plainChunk.Length;
+
+            string body = match.Groups[2].Value.Trim();
+            var evt = new InlineEvent { CharacterIndex = currentPlainIndex };
+
+            // Handle shorthand assignment like [pause="0.5"] where body starts with '='
+            if (body.StartsWith("="))
+            {
+                string val = body.Substring(1).Trim('"', '\'', ' ');
+                if (double.TryParse(val, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out double pTime))
+                {
+                    evt.PauseDuration = pTime;
+                }
+            }
+
+            // Parse key-value attributes (e.g., sfx="boom", volume="-2.0", pause="0.5", time="0.5")
+            var attrMatches = System.Text.RegularExpressions.Regex.Matches(
+                body, 
+                @"(?<key>\w+)\s*=\s*(?:""(?<val>[^""]*)""|'(?<val>[^']*)'|(?<val>[^\s\]]+))"
+            );
+            foreach (System.Text.RegularExpressions.Match attrMatch in attrMatches)
+            {
+                string key = attrMatch.Groups["key"].Value.ToLower();
+                string val = attrMatch.Groups["val"].Value;
+
+                if (key == "pause" || key == "time")
+                {
+                    double.TryParse(val, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out double pauseTime);
+                    evt.PauseDuration = pauseTime;
+                }
+                else if (key == "sfx" || key == "name")
+                {
+                    evt.SfxName = val;
+                }
+                else if (key == "src")
+                {
+                    evt.SfxSrc = val;
+                }
+                else if (key == "volume")
+                {
+                    float.TryParse(val, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out float vol);
+                    evt.SfxVolume = vol;
+                }
+            }
+
+            // Resolve SFX definition from head registry if referenced by name
+            if (!string.IsNullOrEmpty(evt.SfxName) && sfxRegistry != null && sfxRegistry.TryGetValue(evt.SfxName, out var registeredSfx))
+            {
+                evt.SfxSrc = registeredSfx.Src;
+                if (evt.SfxVolume == 0.0f) evt.SfxVolume = registeredSfx.Volume;
+            }
+
+            if (evt.PauseDuration > 0 || !string.IsNullOrEmpty(evt.SfxSrc))
+            {
+                if (!timeline.ContainsKey(currentPlainIndex))
+                {
+                    timeline[currentPlainIndex] = new List<InlineEvent>();
+                }
+                timeline[currentPlainIndex].Add(evt);
+            }
+
+            lastIndex = match.Index + match.Length;
+        }
+
+        sb.Append(rawText.Substring(lastIndex));
+        return sb.ToString();
     }
 
-    public void AttachToNode(Node2D targetNode, Vector2 offset = default)
+    private void PlayOneShotSfx(InlineEvent evt)
     {
-        if (targetNode == null) return;
-        
-        Vector2 screenPos = targetNode.GetGlobalTransformWithCanvas().Origin;
-        
-        if (offset == Vector2.Zero)
+        if (string.IsNullOrEmpty(evt.SfxSrc)) return;
+
+        var stream = AudioLoader.LoadAudioFromFile(evt.SfxSrc);
+        if (stream != null && _sfxAudioPlayer != null)
         {
-            offset = new Vector2(-Size.X / 2f, -Size.Y - 20f);
+            _sfxAudioPlayer.Stream = stream;
+            _sfxAudioPlayer.VolumeDb = evt.SfxVolume;
+            _sfxAudioPlayer.Play();
         }
-        
-        GlobalPosition = screenPos + offset;
     }
 
     private void PlayTypingSound(char currentChar, SoundboardDto soundboard)

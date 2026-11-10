@@ -2,9 +2,27 @@
 <vidml xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
   <head>
     <sprite name = "icosprite" src = "res://icon.svg" width = "300" height = "250"/>
-
+    <sfx name="gstr" src="res://dialogue/sfx/snd_wngdng1.wav" volume="0.0" />
     <soundboard name = "sans-soundboard">
       <sound src = "res://dialogue/sfx/snd_txtsans.wav" />
+    </soundboard>
+    <soundboard name = "gaster">
+      <sound src = "res://dialogue/sfx/snd_wngdng1.wav"/>
+      <sound src = "res://dialogue/sfx/snd_wngdng2.wav"/>
+      <sound src = "res://dialogue/sfx/snd_wngdng3.wav"/>
+      <sound src = "res://dialogue/sfx/snd_wngdng4.wav"/>
+      <sound src = "res://dialogue/sfx/snd_wngdng5.wav"/>
+      <sound src = "res://dialogue/sfx/snd_wngdng6.wav"/>
+      <sound src = "res://dialogue/sfx/snd_wngdng7.wav"/>
+    </soundboard>
+    <soundboard name = "gaster-rand" order="random">
+      <sound src = "res://dialogue/sfx/snd_wngdng1.wav"/>
+      <sound src = "res://dialogue/sfx/snd_wngdng2.wav"/>
+      <sound src = "res://dialogue/sfx/snd_wngdng3.wav"/>
+      <sound src = "res://dialogue/sfx/snd_wngdng4.wav"/>
+      <sound src = "res://dialogue/sfx/snd_wngdng5.wav"/>
+      <sound src = "res://dialogue/sfx/snd_wngdng6.wav"/>
+      <sound src = "res://dialogue/sfx/snd_wngdng7.wav"/>
     </soundboard>
     <sprite-collection name = "sans" default = "default">
       <sprite name = "default"  src = "res://dialogue/images/sansundertale.png" width = "200" height = "200"/>
@@ -27,22 +45,8 @@
   <body>
     <conv uid="intro_conversation"  style = "sans_text">
       <phrase>
-        * [color=red]Holy cow [/color]         
-        * This actually works. 
-      </phrase>
-      <phrase>
-        * The sound seems alright. 
-      </phrase>
-      <phrase>
-        * It's kind of dumb that these files are actually sensitive to newlines though. 
-      </phrase>
-      <phrase>
-        * Plus, those [color=yellow]asterisks[/color] (*) were manually typed by me. 
-        Kind of ugly, ngl. 
-      </phrase>
-      <phrase>
-        * ALSO, THIS IS ALL UPPERCASE. APPARENTLY UNDERTALE'S COMIC SANS TTF ONLY HAS LOWERCASE CHARACTERS. 
-      </phrase>
+        This... [pause="1.0"] this is a pause
+      </phrase> 
     </conv>
   </body>
 </vidml>

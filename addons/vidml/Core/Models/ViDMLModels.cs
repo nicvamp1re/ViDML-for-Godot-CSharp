@@ -31,6 +31,9 @@ public class HeadDto
 
     [XmlElement("sprite-collection")]
     public List<SpriteCollectionDto> SpriteCollections { get; set; } = new();
+    
+    [XmlElement("sfx")]
+    public List<SfxDto> SoundEffects { get; set; } = new();
 }
 
 public class ImportDto
@@ -139,6 +142,12 @@ public class SoundboardDto
 
     [XmlElement("sound")]
     public List<SoundDto> Sounds { get; set; } = new();
+}
+public class SfxDto
+{
+    [XmlAttribute("name")] public string Name { get; set; }
+    [XmlAttribute("src")] public string Src { get; set; }
+    [XmlAttribute("volume")] public float Volume { get; set; } = 0.0f;
 }
 
 public class BodyDto : GroupDto

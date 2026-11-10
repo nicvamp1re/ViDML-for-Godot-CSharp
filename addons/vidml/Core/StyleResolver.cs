@@ -44,6 +44,7 @@ public class ResolvedPhraseData
     public int TextWidth { get; set; }
     public int TextHeight { get; set; }
     public SoundboardDto ResolvedSoundboard { get; set; }
+    public Dictionary<string, SfxDto> HeadSfxRegistry { get; set; }
 }
 
 public static class StyleResolver
@@ -55,7 +56,8 @@ public static class StyleResolver
         Dictionary<string, TextBoxDto> textBoxes,
         Dictionary<string, SpriteDto> sprites,
         Dictionary<string, SpriteCollectionDto> spriteCollections,
-        Dictionary<string, SoundboardDto> soundboards)
+        Dictionary<string, SoundboardDto> soundboards,
+        Dictionary<string, SfxDto> sfxRegistry)
     {
         // Clean up XML formatting whitespace and newlines from text content
         string rawText = phrase?.TextContent ?? string.Empty;
@@ -139,6 +141,7 @@ public static class StyleResolver
         {
             resolved.ResolvedSoundboard = sb;
         }
+        resolved.HeadSfxRegistry = sfxRegistry;
 
         return resolved;
     }

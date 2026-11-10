@@ -20,6 +20,7 @@ public partial class ViDMLManager : Node
     private readonly Dictionary<string, SpriteDto> _sprites = new();
     private readonly Dictionary<string, SpriteCollectionDto> _spriteCollections = new();
     private readonly Dictionary<string, SoundboardDto> _soundboards = new();
+    private readonly Dictionary<string, SfxDto> _sfxRegistry = new();
 
     private ViDMLDialogBox _activeDialogBox;
 
@@ -44,6 +45,7 @@ public partial class ViDMLManager : Node
         _sprites.Clear();
         _spriteCollections.Clear();
         _soundboards.Clear();
+        _sfxRegistry.Clear();
 
         string langPath = $"{BaseDialoguePath}/{CurrentLanguage}";
 
@@ -69,15 +71,16 @@ public partial class ViDMLManager : Node
                         _styles, 
                         _textBoxes, 
                         _sprites, 
-                        _spriteCollections,
-                        _soundboards
+                        _spriteCollections, 
+                        _soundboards,
+                        _sfxRegistry
                     );
                 }
                 fileName = dir.GetNext();
             }
         }
 
-        GD.Print($"[ViDML] Initialized '{CurrentLanguage}': Loaded {_conversations.Count} conversations, {_spriteCollections.Count} collections.");
+        GD.Print($"[ViDML] Initialized '{CurrentLanguage}': Loaded {_conversations.Count} conversations, {_sfxRegistry.Count} SFX definitions, and {_soundboards.Count} soundboards.");
     }
 
     public async Task PlayConv(
@@ -113,8 +116,9 @@ public partial class ViDMLManager : Node
                 _styles, 
                 _textBoxes, 
                 _sprites, 
-                _spriteCollections,
-                _soundboards
+                _spriteCollections, 
+                _soundboards,
+                _sfxRegistry
             );
             await _activeDialogBox.PlayPhraseAsync(resolvedData);
         }
