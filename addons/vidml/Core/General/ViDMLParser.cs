@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Xml.Serialization;
@@ -10,7 +9,7 @@ namespace ViDML.Core;
 public static class ViDMLParser
 {
     public static void LoadAndRegister(
-        string filePath, 
+        string filePath,
         Dictionary<string, ConvDto> conversationRegistry,
         Dictionary<string, StyleDto> styleRegistry,
         Dictionary<string, TextBoxDto> textBoxRegistry,
@@ -18,118 +17,94 @@ public static class ViDMLParser
         Dictionary<string, SpriteCollectionDto> spriteCollectionRegistry,
         Dictionary<string, SoundboardDto> soundboardRegistry,
         Dictionary<string, SfxDto> sfxRegistry)
-        
     {
         if (!Godot.FileAccess.FileExists(filePath))
         {
-            GD.PrintErr($"[ViDML] File not found: {filePath}");
+            GD.PrintErr($"[ViDML] File not found at path: {filePath}");
             return;
         }
 
-        string xmlContent;
-        using (var file = Godot.FileAccess.Open(filePath, Godot.FileAccess.ModeFlags.Read))
+        string xmlContent = Godot.FileAccess.GetFileAsString(filePath);
+        if (string.IsNullOrWhiteSpace(xmlContent))
         {
-            xmlContent = file.GetAsText();
+            GD.PrintErr($"[ViDML] File is empty at path: {filePath}");
+            return;
         }
 
+        VidmlRootDto root;
         try
         {
-            var serializer = new XmlSerializer(typeof(VidmlRoot));
+            var serializer = new XmlSerializer(typeof(VidmlRootDto));
             using var reader = new StringReader(xmlContent);
-            var root = (VidmlRoot)serializer.Deserialize(reader);
-
-            if (root == null) return;
-
-            if (root.Head != null)
-            {
-                if (root.Head.Styles != null)
-                {
-                    foreach (var style in root.Head.Styles)
-                    {
-                        if (!string.IsNullOrEmpty(style.Name)) 
-                            styleRegistry[style.Name] = style;
-                    }
-                }
-                if (root.Head.TextBoxes != null)
-                {
-                    foreach (var box in root.Head.TextBoxes)
-                    {
-                        if (!string.IsNullOrEmpty(box.Name)) 
-                            textBoxRegistry[box.Name] = box;
-                    }
-                }
-                if (root.Head.Sprites != null)
-                {
-                    foreach (var sprite in root.Head.Sprites)
-                    {
-                        if (!string.IsNullOrEmpty(sprite.Name)) 
-                            spriteRegistry[sprite.Name] = sprite;
-                    }
-                }
-                if (root.Head.SpriteCollections != null)
-                {
-                    foreach (var collection in root.Head.SpriteCollections)
-                    {
-                        if (!string.IsNullOrEmpty(collection.Name)) 
-                            spriteCollectionRegistry[collection.Name] = collection;
-                    }
-                }
-                if (root.Head.Soundboards != null)
-                {
-                    foreach (var sb in root.Head.Soundboards)
-                    {
-                        if (!string.IsNullOrEmpty(sb.Name)) 
-                            soundboardRegistry[sb.Name] = sb;
-                    }
-                }
-                if (root.Head.SoundEffects != null)
-                {
-                    foreach (var sfx in root.Head.SoundEffects)
-                    {
-                        if (!string.IsNullOrEmpty(sfx.Name)) 
-                            sfxRegistry[sfx.Name] = sfx;
-                    }
-                }
-            }
-
-            if (root.Body != null)
-            {
-                RegisterGroup(root.Body, conversationRegistry);
-            }
-            
-            GD.Print($"[ViDML] Successfully parsed and indexed: {filePath}");
+            root = (VidmlRootDto)serializer.Deserialize(reader);
         }
-        catch (Exception ex)
+        catch (System.Exception ex)
         {
-            GD.PrintErr($"[ViDML] Failed to parse XML at {filePath}. Error: {ex.Message}");
+            GD.PrintErr($"[ViDML] Failed to parse XML at {filePath}: {ex.Message}");
+            return;
+        }
+
+        if (root == null) return;
+
+        // 1. Register Head Assets
+        if (root.Head != null)
+        {
+            if (root.Head.TextBoxList != null)
+                foreach (var box in root.Head.TextBoxList)
+                    if (!string.IsNullOrEmpty(box.Name)) textBoxRegistry[box.Name] = box;
+
+            if (root.Head.SpriteList != null)
+                foreach (var spr in root.Head.SpriteList)
+                    if (!string.IsNullOrEmpty(spr.Name)) spriteRegistry[spr.Name] = spr;
+
+            if (root.Head.SpriteCollectionList != null)
+                foreach (var col in root.Head.SpriteCollectionList)
+                    if (!string.IsNullOrEmpty(col.Name)) spriteCollectionRegistry[col.Name] = col;
+
+            if (root.Head.SoundboardList != null)
+                foreach (var sb in root.Head.SoundboardList)
+                    if (!string.IsNullOrEmpty(sb.Name)) soundboardRegistry[sb.Name] = sb;
+
+            if (root.Head.SoundEffects != null)
+                foreach (var sfx in root.Head.SoundEffects)
+                    if (!string.IsNullOrEmpty(sfx.Name)) sfxRegistry[sfx.Name] = sfx;
+
+            if (root.Head.StyleList != null)
+                foreach (var sty in root.Head.StyleList)
+                    if (!string.IsNullOrEmpty(sty.Name)) styleRegistry[sty.Name] = sty;
+        }
+
+        // 2. Register Body Conversations & Recursive Groups
+        if (root.Body != null)
+        {
+            RegisterBodyElements(root.Body.Conversations, root.Body.Groups, new List<GroupDto>(), conversationRegistry);
         }
     }
 
-    private static void RegisterGroup(GroupDto group, Dictionary<string, ConvDto> registry)
+    private static void RegisterBodyElements(
+        List<ConvDto> convs,
+        List<GroupDto> groups,
+        List<GroupDto> ancestorGroups,
+        Dictionary<string, ConvDto> conversationRegistry)
     {
-        if (group.Convs != null)
+        if (convs != null)
         {
-            foreach (var conv in group.Convs)
+            foreach (var conv in convs)
             {
                 if (!string.IsNullOrEmpty(conv.Uid))
                 {
-                    if (registry.ContainsKey(conv.Uid))
-                    {
-                        GD.PrintErr($"[ViDML] Duplicate conversation UID detected across files: '{conv.Uid}'");
-                    }
-                    else
-                    {
-                        registry[conv.Uid] = conv;
-                    }
+                    conv.ParentGroups = new List<GroupDto>(ancestorGroups);
+                    conversationRegistry[conv.Uid] = conv;
                 }
             }
         }
 
-        if (group.Groups != null)
+        if (groups != null)
         {
-            foreach (var subGroup in group.Groups)
+            foreach (var group in groups)
             {
-                RegisterGroup(subGroup, registry);
+                var nextAncestors = new List<GroupDto>(ancestorGroups) { group };
+                RegisterBodyElements(group.Conversations, group.Groups, nextAncestors, conversationRegistry);
             }
         }
     }

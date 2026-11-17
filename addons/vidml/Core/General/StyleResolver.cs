@@ -7,6 +7,15 @@ public class ResolvedPhraseData
 {
     public string Text { get; set; }
     public string Font { get; set; }
+    public string FontB { get; set; }
+    public string FontI { get; set; }
+    public string FontBi { get; set; }
+    public string FontMono { get; set; }
+
+    public int FontSizeB { get; set; }
+    public int FontSizeI { get; set; }
+    public int FontSizeBi { get; set; }
+    public int FontSizeMono { get; set; }
     public int FontSize { get; set; }
     public string Color { get; set; }
     public double Opacity { get; set; }
@@ -26,13 +35,12 @@ public class ResolvedPhraseData
     public int BoxWidth { get; set; }
     public int BoxHeight { get; set; }
 
-    // Intermediate tracking fields for cascade resolution
     public string SpriteName { get; set; }
     public string SpriteCollectionName { get; set; }
     public string EmotionName { get; set; }
     public string SoundboardName { get; set; }
+    public string SilentCharacters { get; set; }
 
-    // Final Resolved Output Fields
     public string SpritePath { get; set; }
     public int SpriteWidth { get; set; }
     public int SpriteHeight { get; set; }
@@ -43,6 +51,7 @@ public class ResolvedPhraseData
     public int VerticalSpacing { get; set; }
     public int TextWidth { get; set; }
     public int TextHeight { get; set; }
+    
     public SoundboardDto ResolvedSoundboard { get; set; }
     public Dictionary<string, SfxDto> HeadSfxRegistry { get; set; }
 }
@@ -59,50 +68,75 @@ public static class StyleResolver
         Dictionary<string, SoundboardDto> soundboards,
         Dictionary<string, SfxDto> sfxRegistry)
     {
-        // Clean up XML formatting whitespace and newlines from text content
         string rawText = phrase?.TextContent ?? string.Empty;
         string cleanedText = CleanXmlText(rawText);
 
         var resolved = new ResolvedPhraseData
         {
             Text = cleanedText,
-            Font = conv?.Font,
-            FontSize = conv?.FontSize ?? 14,
-            Color = conv?.Color ?? "#ffffff",
-            Opacity = conv?.Opacity ?? 1.0,
-            CharSpeed = conv?.CharSpeed ?? 30,
-            InstantCharacters = conv?.InstantCharacters ?? false,
-            MaxLineAmount = conv?.MaxLineAmount ?? 3,
-            NewLineSymbol = conv?.NewLineSymbol ?? "",
-            TextDirection = conv?.TextDirection ?? "left-to-right",
-            TextAlign = conv?.TextAlign ?? "start",
-            AutoMoveNext = conv?.AutoMoveNext ?? false,
-            AutoMoveNextDelay = conv?.AutoMoveNextDelay ?? 0,
-            AllowManualSkip = conv?.AllowManualSkip ?? true,
-            AllowManualMoveNext = conv?.AllowManualMoveNext ?? true,
-            DialogueBoxName = conv?.DialogueBox,
-            VerticalSpacing = conv?.VerticalSpacing ?? 0,
-            TextHeight = conv?.TextHeight ?? 300,
-            TextWidth = conv?.TextWidth ?? 1000
+            FontSize = 14,
+            Color = "#ffffff",
+            Opacity = 1.0,
+            CharSpeed = 30,
+            InstantCharacters = false,
+            MaxLineAmount = 3,
+            NewLineSymbol = "",
+            TextDirection = "left-to-right",
+            TextAlign = "start",
+            AutoMoveNext = false,
+            AutoMoveNextDelay = 0,
+            AllowManualSkip = true,
+            AllowManualMoveNext = true,
+            VerticalSpacing = 0,
+            TextHeight = 300,
+            TextWidth = 1200,
+            HeadSfxRegistry = sfxRegistry,
+            SilentCharacters = "\n.,!?-+*/:;<>@ "
         };
 
-        // 1. Start with Conv-level settings if present
+        // 1. Resolve style hierarchy (Phrase > Conv > Innermost Group -> Outermost Group)
+        string effectiveStyleName = phrase?.Style;
+        if (string.IsNullOrEmpty(effectiveStyleName)) effectiveStyleName = conv?.Style;
+        if (string.IsNullOrEmpty(effectiveStyleName) && conv?.ParentGroups != null)
+        {
+            for (int i = conv.ParentGroups.Count - 1; i >= 0; i--)
+            {
+                if (!string.IsNullOrEmpty(conv.ParentGroups[i].Style))
+                {
+                    effectiveStyleName = conv.ParentGroups[i].Style;
+                    break;
+                }
+            }
+        }
+
+        // 2. Apply Head Style base
+        if (!string.IsNullOrEmpty(effectiveStyleName) && headStyles != null && headStyles.TryGetValue(effectiveStyleName, out var headStyle))
+        {
+            ApplySettings(resolved, headStyle);
+        }
+
+        // 3. Apply Group overrides from outermost to innermost
+        if (conv?.ParentGroups != null)
+        {
+            foreach (var group in conv.ParentGroups)
+            {
+                ApplySettings(resolved, group);
+            }
+        }
+
+        // 4. Apply Conversation overrides
         if (conv != null)
         {
             ApplySettings(resolved, conv);
         }
 
-        // 2. Cascade Head Style (if referenced by Phrase or Conv)
-        string styleName = !string.IsNullOrEmpty(phrase.Style) ? phrase.Style : conv?.Style;
-        if (!string.IsNullOrEmpty(styleName) && headStyles != null && headStyles.TryGetValue(styleName, out var headStyle))
+        // 5. Apply direct Phrase overrides (highest precedence)
+        if (phrase != null)
         {
-            ApplySettings(resolved, headStyle);
+            ApplySettings(resolved, phrase);
         }
 
-        // 3. Apply direct Phrase overrides (highest precedence)
-        ApplySettings(resolved, phrase);
-
-        // 4. Resolve Box Dimensions & Path
+        // 6. Resolve Asset Links (TextBox, Sprite, Soundboard)
         if (!string.IsNullOrEmpty(resolved.DialogueBoxName) && textBoxes != null && textBoxes.TryGetValue(resolved.DialogueBoxName, out var textBox))
         {
             resolved.DialogueBoxPath = textBox.Src;
@@ -110,19 +144,14 @@ public static class StyleResolver
             resolved.BoxHeight = textBox.Height;
         }
 
-        // 5. Resolve Sprite via Direct Name OR Sprite-Collection + Emotion
         SpriteDto resolvedSprite = null;
-
-        // Path A: Directly referenced single sprite tag
         if (!string.IsNullOrEmpty(resolved.SpriteName) && sprites != null)
         {
             sprites.TryGetValue(resolved.SpriteName, out resolvedSprite);
         }
-        // Path B: Collection reference (inherited from Conv, Style, or Phrase)
         else if (!string.IsNullOrEmpty(resolved.SpriteCollectionName) && spriteCollections != null && spriteCollections.TryGetValue(resolved.SpriteCollectionName, out var collection))
         {
             string spriteToFind = !string.IsNullOrEmpty(resolved.EmotionName) ? resolved.EmotionName : collection.DefaultSprite;
-
             if (!string.IsNullOrEmpty(spriteToFind) && collection.Sprites != null)
             {
                 resolvedSprite = collection.Sprites.Find(s => s.Name == spriteToFind);
@@ -136,64 +165,41 @@ public static class StyleResolver
             resolved.SpriteHeight = resolvedSprite.Height;
         }
 
-        // 6. Resolve Soundboard Reference
         if (!string.IsNullOrEmpty(resolved.SoundboardName) && soundboards != null && soundboards.TryGetValue(resolved.SoundboardName, out var sb))
         {
             resolved.ResolvedSoundboard = sb;
         }
-        resolved.HeadSfxRegistry = sfxRegistry;
+        if (resolved.FontSizeB <= 0) resolved.FontSizeB = resolved.FontSize;
+        if (resolved.FontSizeI <= 0) resolved.FontSizeI = resolved.FontSize;
+        if (resolved.FontSizeBi <= 0) resolved.FontSizeBi = resolved.FontSize;
+        if (resolved.FontSizeMono <= 0) resolved.FontSizeMono = resolved.FontSize;
 
         return resolved;
     }
 
-    /// <summary>
-    /// Removes leading/trailing XML padding/newlines and normalizes indentation.
-    /// </summary>
     private static string CleanXmlText(string text)
     {
-        if (string.IsNullOrEmpty(text))
-            return string.Empty;
-
-        // Split into lines to remove uniform XML indentation if multiline
+        if (string.IsNullOrEmpty(text)) return string.Empty;
         var lines = text.Split(new[] { "\r\n", "\r", "\n" }, System.StringSplitOptions.None);
-        
-        // If it's a single line or empty, just trim it
-        if (lines.Length <= 1)
-            return text.Trim();
+        if (lines.Length <= 1) return text.Trim();
 
-        // Find minimum indentation of non-empty lines to strip excess XML spacing
         int minIndent = int.MaxValue;
         foreach (var line in lines)
         {
             if (string.IsNullOrWhiteSpace(line)) continue;
             int indent = 0;
-            while (indent < line.Length && char.IsWhiteSpace(line[indent]))
-            {
-                indent++;
-            }
+            while (indent < line.Length && char.IsWhiteSpace(line[indent])) indent++;
             if (indent < minIndent) minIndent = indent;
         }
 
         var cleanedLines = new List<string>();
         foreach (var line in lines)
         {
-            if (string.IsNullOrWhiteSpace(line))
-            {
-                cleanedLines.Add(string.Empty);
-                continue;
-            }
-
-            if (minIndent > 0 && line.Length >= minIndent)
-            {
-                cleanedLines.Add(line.Substring(minIndent));
-            }
-            else
-            {
-                cleanedLines.Add(line.TrimStart());
-            }
+            if (string.IsNullOrWhiteSpace(line)) { cleanedLines.Add(string.Empty); continue; }
+            if (minIndent > 0 && line.Length >= minIndent) cleanedLines.Add(line.Substring(minIndent));
+            else cleanedLines.Add(line.TrimStart());
         }
 
-        // Rejoin and trim outer whitespace
         return string.Join("\n", cleanedLines).Trim();
     }
 
@@ -202,7 +208,15 @@ public static class StyleResolver
         if (source == null) return;
 
         if (!string.IsNullOrEmpty(source.Font)) target.Font = source.Font;
+        if (!string.IsNullOrEmpty(source.FontB)) target.FontB = source.FontB;
+        if (!string.IsNullOrEmpty(source.FontI)) target.FontI = source.FontI;
+        if (!string.IsNullOrEmpty(source.FontBi)) target.FontBi = source.FontBi;
+        if (!string.IsNullOrEmpty(source.FontMono)) target.FontMono = source.FontMono;
         if (source.FontSize != 14) target.FontSize = source.FontSize;
+        if (source.FontSizeB > 0) target.FontSizeB = source.FontSizeB;
+        if (source.FontSizeI > 0) target.FontSizeI = source.FontSizeI;
+        if (source.FontSizeBi > 0) target.FontSizeBi = source.FontSizeBi;
+        if (source.FontSizeMono > 0) target.FontSizeMono = source.FontSizeMono;
         if (!string.IsNullOrEmpty(source.Color) && source.Color != "#ffffff") target.Color = source.Color;
         if (source.Opacity != 1.0) target.Opacity = source.Opacity;
         if (source.CharSpeed != 30) target.CharSpeed = source.CharSpeed;
@@ -217,7 +231,6 @@ public static class StyleResolver
         if (!source.AllowManualMoveNext) target.AllowManualMoveNext = false;
         if (!string.IsNullOrEmpty(source.DialogueBox)) target.DialogueBoxName = source.DialogueBox;
 
-        // Carry forward asset, spacing, and dimensions references
         if (!string.IsNullOrEmpty(source.Sprite)) target.SpriteName = source.Sprite;
         if (!string.IsNullOrEmpty(source.SpriteCollection)) target.SpriteCollectionName = source.SpriteCollection;
         if (!string.IsNullOrEmpty(source.Emotion)) target.EmotionName = source.Emotion;
@@ -230,5 +243,6 @@ public static class StyleResolver
         if (source.VerticalSpacing != 0) target.VerticalSpacing = source.VerticalSpacing;
         if (source.TextWidth != 0) target.TextWidth = source.TextWidth;
         if (source.TextHeight != 0) target.TextHeight = source.TextHeight;
+        if (source.SilentCharacters != "\n.,!?-+*/:;<>") target.SilentCharacters = source.SilentCharacters;
     }
 }

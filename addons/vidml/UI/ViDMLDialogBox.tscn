@@ -31,7 +31,7 @@ stretch_mode = 5
 
 [node name="DialogueText" type="RichTextLabel" parent="." unique_id=1523845785]
 layout_mode = 0
-offset_right = 600.0
+offset_right = 1000.0
 offset_bottom = 200.0
 bbcode_enabled = true
 visible_characters_behavior = 1

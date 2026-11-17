@@ -76,41 +76,85 @@ public partial class ViDMLDialogBox : Control
     }
 
     private void ApplyTextStyles(ResolvedPhraseData data)
+{
+    if (_textLabel == null) return;
+
+    Color textColor = Colors.White;
+    if (!string.IsNullOrEmpty(data.Color))
     {
-        if (_textLabel == null) return;
-
-        Color textColor = Colors.White;
-        if (!string.IsNullOrEmpty(data.Color))
-        {
-            textColor = Color.FromString(data.Color, Colors.White);
-        }
-        textColor.A = (float)data.Opacity;
-        _textLabel.AddThemeColorOverride("default_color", textColor);
-
-        if (data.FontSize > 0)
-        {
-            _textLabel.AddThemeFontSizeOverride("normal_font_size", data.FontSize);
-        }
-
-        if (!string.IsNullOrEmpty(data.Font))
-        {
-            var fontResource = TextureLoader.LoadFontFromFile(data.Font);
-            if (fontResource != null)
-            {
-                _textLabel.AddThemeFontOverride("normal_font", fontResource);
-            }
-        }
-
-        _textLabel.HorizontalAlignment = data.TextAlign?.ToLower() switch
-        {
-            "center" => HorizontalAlignment.Center,
-            "right" or "end" => HorizontalAlignment.Right,
-            "fill" or "justify" => HorizontalAlignment.Fill,
-            _ => HorizontalAlignment.Left
-        };
-        
-        _textLabel.AddThemeConstantOverride("line_separation", data.VerticalSpacing);
+        textColor = Color.FromString(data.Color, Colors.White);
     }
+    textColor.A = (float)data.Opacity;
+    _textLabel.AddThemeColorOverride("default_color", textColor);
+
+    // 1. Normal Font & Size
+    if (data.FontSize > 0)
+    {
+        _textLabel.AddThemeFontSizeOverride("normal_font_size", data.FontSize);
+    }
+    if (!string.IsNullOrEmpty(data.Font))
+    {
+        var fontResource = TextureLoader.LoadFontFromFile(data.Font);
+        if (fontResource != null)
+        {
+            _textLabel.AddThemeFontOverride("normal_font", fontResource);
+        }
+    }
+
+    // 2. Bold Font & Size
+    if (data.FontSizeB > 0)
+    {
+        _textLabel.AddThemeFontSizeOverride("bold_font_size", data.FontSizeB);
+    }
+    if (!string.IsNullOrEmpty(data.FontB))
+    {
+        var fontRes = TextureLoader.LoadFontFromFile(data.FontB);
+        if (fontRes != null) _textLabel.AddThemeFontOverride("bold_font", fontRes);
+    }
+
+    // 3. Italic Font & Size
+    if (data.FontSizeI > 0)
+    {
+        _textLabel.AddThemeFontSizeOverride("italics_font_size", data.FontSizeI);
+    }
+    if (!string.IsNullOrEmpty(data.FontI))
+    {
+        var fontRes = TextureLoader.LoadFontFromFile(data.FontI);
+        if (fontRes != null) _textLabel.AddThemeFontOverride("italics_font", fontRes);
+    }
+
+    // 4. Bold-Italic Font & Size
+    if (data.FontSizeBi > 0)
+    {
+        _textLabel.AddThemeFontSizeOverride("bold_italics_font_size", data.FontSizeBi);
+    }
+    if (!string.IsNullOrEmpty(data.FontBi))
+    {
+        var fontRes = TextureLoader.LoadFontFromFile(data.FontBi);
+        if (fontRes != null) _textLabel.AddThemeFontOverride("bold_italics_font_size", fontRes);
+    }
+
+    // 5. Monospace Font & Size
+    if (data.FontSizeMono > 0)
+    {
+        _textLabel.AddThemeFontSizeOverride("mono_font_size", data.FontSizeMono);
+    }
+    if (!string.IsNullOrEmpty(data.FontMono))
+    {
+        var fontRes = TextureLoader.LoadFontFromFile(data.FontMono);
+        if (fontRes != null) _textLabel.AddThemeFontOverride("mono_font", fontRes);
+    }
+
+    _textLabel.HorizontalAlignment = data.TextAlign?.ToLower() switch
+    {
+        "center" => HorizontalAlignment.Center,
+        "right" or "end" => HorizontalAlignment.Right,
+        "fill" or "justify" => HorizontalAlignment.Fill,
+        _ => HorizontalAlignment.Left
+    };
+    
+    _textLabel.AddThemeConstantOverride("line_separation", data.VerticalSpacing);
+}
 
     public async Task PlayPhraseAsync(ResolvedPhraseData data)
     {
@@ -134,12 +178,24 @@ public partial class ViDMLDialogBox : Control
 
         ApplyTextStyles(data);
 
-        if (_textLabel != null)
-        {
-            _textLabel.Position = new Vector2(data.TextPosX, data.TextPosY);
-            _textLabel.CustomMinimumSize = new Vector2(data.TextWidth, data.TextHeight);
-            _textLabel.Size = _textLabel.CustomMinimumSize;
-        }
+    if (_textLabel != null)
+    {
+        // 1. Break any Full-Rect or stretch anchors that override manual sizing
+        _textLabel.SetAnchorsPreset(Control.LayoutPreset.TopLeft);
+        
+        // 2. Disable FitContent so height doesn't auto-collapse/expand on its own
+        _textLabel.FitContent = false;
+        _textLabel.AutowrapMode = TextServer.AutowrapMode.WordSmart;
+
+        // 3. Apply position and explicit pixel dimensions
+        _textLabel.Position = new Vector2(data.TextPosX, data.TextPosY);
+
+        float width = data.TextWidth > 0 ? data.TextWidth : 1000;
+        float height = data.TextHeight > 0 ? data.TextHeight : 300;
+
+        _textLabel.CustomMinimumSize = new Vector2(width, height);
+        _textLabel.Size = new Vector2(width, height);
+    }
 
         if (_portraitSprite != null)
         {
@@ -161,7 +217,7 @@ public partial class ViDMLDialogBox : Control
                 _portraitSprite.Visible = false;
             }
         }
-
+        
         if (_textLabel != null)
         {
             // Parse and strip custom [pause] and [sfx] tags, building the event timeline
@@ -221,7 +277,7 @@ public partial class ViDMLDialogBox : Control
                         if (_textLabel.VisibleCharacters > prevVisible && prevVisible >= 0 && prevVisible < plainText.Length)
                         {
                             char revealedChar = plainText[prevVisible];
-                            PlayTypingSound(revealedChar, data.ResolvedSoundboard);
+                            PlayTypingSound(revealedChar, data.ResolvedSoundboard, data.SilentCharacters);
                         }
                     }
 
@@ -279,24 +335,19 @@ public partial class ViDMLDialogBox : Control
             string plainChunk = _bbcodeRegex.Sub(textChunk, "", true);
             currentPlainIndex += plainChunk.Length;
 
+            string tagName = match.Groups[1].Value.ToLower();
             string body = match.Groups[2].Value.Trim();
             var evt = new InlineEvent { CharacterIndex = currentPlainIndex };
 
-            // Handle shorthand assignment like [pause="0.5"] where body starts with '='
-            if (body.StartsWith("="))
-            {
-                string val = body.Substring(1).Trim('"', '\'', ' ');
-                if (double.TryParse(val, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out double pTime))
-                {
-                    evt.PauseDuration = pTime;
-                }
-            }
+            // Reconstruct full inner text so shorthand like [pause="0.5" sfx="boom"] or [sfx="boom" pause="0.5"]
+            // becomes uniform "pause=\"0.5\" sfx=\"boom\"" for the attribute parser
+            string fullInner = body.StartsWith("=") ? $"{tagName}{body}" : $"{tagName} {body}";
 
-            // Parse key-value attributes (e.g., sfx="boom", volume="-2.0", pause="0.5", time="0.5")
             var attrMatches = System.Text.RegularExpressions.Regex.Matches(
-                body, 
+                fullInner,
                 @"(?<key>\w+)\s*=\s*(?:""(?<val>[^""]*)""|'(?<val>[^']*)'|(?<val>[^\s\]]+))"
             );
+
             foreach (System.Text.RegularExpressions.Match attrMatch in attrMatches)
             {
                 string key = attrMatch.Groups["key"].Value.ToLower();
@@ -304,8 +355,10 @@ public partial class ViDMLDialogBox : Control
 
                 if (key == "pause" || key == "time")
                 {
-                    double.TryParse(val, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out double pauseTime);
-                    evt.PauseDuration = pauseTime;
+                    if (double.TryParse(val, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out double pauseTime))
+                    {
+                        evt.PauseDuration = pauseTime;
+                    }
                 }
                 else if (key == "sfx" || key == "name")
                 {
@@ -317,8 +370,10 @@ public partial class ViDMLDialogBox : Control
                 }
                 else if (key == "volume")
                 {
-                    float.TryParse(val, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out float vol);
-                    evt.SfxVolume = vol;
+                    if (float.TryParse(val, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out float vol))
+                    {
+                        evt.SfxVolume = vol;
+                    }
                 }
             }
 
@@ -358,15 +413,15 @@ public partial class ViDMLDialogBox : Control
         }
     }
 
-    private void PlayTypingSound(char currentChar, SoundboardDto soundboard)
+    private void PlayTypingSound(char currentChar, SoundboardDto soundboard, string silentChars)
     {
         if (soundboard == null || soundboard.Sounds == null || soundboard.Sounds.Count == 0)
             return;
 
-        if (soundboard.IgnoreSpaces)
+        // Check if character is part of the silent-characters string
+        if (!string.IsNullOrEmpty(silentChars) && silentChars.IndexOf(currentChar) >= 0)
         {
-            if (char.IsWhiteSpace(currentChar) || char.IsPunctuation(currentChar))
-                return;
+            return;
         }
 
         SoundDto targetSound = null;

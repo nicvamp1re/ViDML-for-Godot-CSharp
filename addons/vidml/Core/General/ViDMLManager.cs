@@ -10,7 +10,7 @@ public partial class ViDMLManager : Node
 {
     public static ViDMLManager Instance { get; private set; }
 
-    [Export] public string BaseDialoguePath { get; set; } = "res://dialogue";
+    [Export] public string BaseDialoguePath { get; set; } = "res://test/dialogue";
     [Export] public string CurrentLanguage { get; set; } = "en";
     [Export] public PackedScene DefaultDialogBoxScene { get; set; }
 
@@ -22,7 +22,8 @@ public partial class ViDMLManager : Node
     private readonly Dictionary<string, SoundboardDto> _soundboards = new();
     private readonly Dictionary<string, SfxDto> _sfxRegistry = new();
 
-    private ViDMLDialogBox _activeDialogBox;
+    // Supports simultaneous multi-window dialogue boxes keyed by unique window strings
+    private readonly Dictionary<string, ViDMLDialogBox> _activeWindows = new();
 
     public override void _EnterTree()
     {
@@ -46,12 +47,12 @@ public partial class ViDMLManager : Node
         _spriteCollections.Clear();
         _soundboards.Clear();
         _sfxRegistry.Clear();
+        _activeWindows.Clear();
 
         string langPath = $"{BaseDialoguePath}/{CurrentLanguage}";
 
         if (!DirAccess.DirExistsAbsolute(langPath))
         {
-            GD.PrintErr($"[ViDML] Language directory does not exist: {langPath}");
             return;
         }
 
@@ -79,12 +80,11 @@ public partial class ViDMLManager : Node
                 fileName = dir.GetNext();
             }
         }
-
-        GD.Print($"[ViDML] Initialized '{CurrentLanguage}': Loaded {_conversations.Count} conversations, {_sfxRegistry.Count} SFX definitions, and {_soundboards.Count} soundboards.");
     }
 
     public async Task PlayConv(
         string convUid, 
+        string windowKey = "default",
         Vector2? position = null, 
         Node2D targetNode = null, 
         Vector2 offset = default)
@@ -95,17 +95,16 @@ public partial class ViDMLManager : Node
             return;
         }
 
-        EnsureDialogBoxInstance();
-
-        if (_activeDialogBox == null) return;
+        var dialogBox = GetOrCreateDialogBoxWindow(windowKey);
+        if (dialogBox == null) return;
 
         if (targetNode != null)
         {
-            _activeDialogBox.AttachToNode(targetNode, offset);
+            dialogBox.AttachToNode(targetNode, offset);
         }
         else if (position.HasValue)
         {
-            _activeDialogBox.SetPosition(position.Value);
+            dialogBox.SetPosition(position.Value);
         }
 
         foreach (var phrase in conv.Phrases)
@@ -120,24 +119,28 @@ public partial class ViDMLManager : Node
                 _soundboards,
                 _sfxRegistry
             );
-            await _activeDialogBox.PlayPhraseAsync(resolvedData);
+            await dialogBox.PlayPhraseAsync(resolvedData);
         }
 
-        _activeDialogBox.Visible = false;
+        dialogBox.Visible = false;
     }
 
-    private void EnsureDialogBoxInstance()
+    private ViDMLDialogBox GetOrCreateDialogBoxWindow(string windowKey)
     {
-        if (_activeDialogBox != null && GodotObject.IsInstanceValid(_activeDialogBox))
-            return;
+        if (_activeWindows.TryGetValue(windowKey, out var box) && GodotObject.IsInstanceValid(box))
+        {
+            return box;
+        }
 
-        _activeDialogBox = GetTree().Root.FindChild("ViDMLDialogBox", true, false) as ViDMLDialogBox;
-
-        if (_activeDialogBox == null && DefaultDialogBoxScene != null)
+        if (DefaultDialogBoxScene != null)
         {
             var instance = DefaultDialogBoxScene.Instantiate<ViDMLDialogBox>();
             GetTree().Root.AddChild(instance);
-            _activeDialogBox = instance;
+            _activeWindows[windowKey] = instance;
+            return instance;
         }
+
+        GD.PrintErr("[ViDML] DefaultDialogBoxScene is not assigned in ViDMLManager!");
+        return null;
     }
 }
