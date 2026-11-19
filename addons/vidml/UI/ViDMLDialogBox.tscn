@@ -24,8 +24,8 @@ grow_vertical = 2
 
 [node name="PortraitSprite" type="TextureRect" parent="." unique_id=1408887390]
 layout_mode = 0
-offset_right = 100.0
-offset_bottom = 100.0
+offset_right = 1.0
+offset_bottom = 1.0
 expand_mode = 1
 stretch_mode = 5
 
