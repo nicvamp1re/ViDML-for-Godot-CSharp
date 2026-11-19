@@ -111,7 +111,7 @@ public class TextSettingsDto
     [XmlAttribute("vertical-spacing")] public int VerticalSpacing { get; set; } = 0;
     [XmlAttribute("text-width")] public int TextWidth { get; set; }
     [XmlAttribute("text-height")] public int TextHeight { get; set; }
-    [XmlAttribute("silent-characters")] public string SilentCharacters { get; set; } = "\n.,!?-+*/:;<>()";
+    [XmlAttribute("silent-characters")] public string SilentCharacters { get; set; } = "\n.,!?-+*/:;<>( )";
 }
 
 public class TextBoxDto
