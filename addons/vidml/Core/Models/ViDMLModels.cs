@@ -92,7 +92,7 @@ public class TextSettingsDto
     [XmlAttribute("max-line-amount")] public int MaxLineAmount { get; set; } = 3;
     [XmlAttribute("new-line-symbol")] public string NewLineSymbol { get; set; } = "";
     [XmlAttribute("text-direction")] public string TextDirection { get; set; } = "left-to-right";
-    [XmlAttribute("text-align")] public string TextAlign { get; set; } = "start";
+    [XmlAttribute("text-align")] public string TextAlign { get; set; }
     [XmlAttribute("auto-move-next")] public bool AutoMoveNext { get; set; } = false;
     [XmlAttribute("auto-move-next-delay")] public double AutoMoveNextDelay { get; set; } = 0;
     [XmlAttribute("allow-manual-skip")] public bool AllowManualSkip { get; set; } = true;

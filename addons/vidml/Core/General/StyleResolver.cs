@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using Godot;
 using ViDML.Core.Models;
 
 namespace ViDML.Core;
@@ -224,7 +225,8 @@ public static class StyleResolver
         if (source.MaxLineAmount != 3) target.MaxLineAmount = source.MaxLineAmount;
         if (source.NewLineSymbol != "") target.NewLineSymbol = source.NewLineSymbol;
         if (!string.IsNullOrEmpty(source.TextDirection)) target.TextDirection = source.TextDirection;
-        if (!string.IsNullOrEmpty(source.TextAlign)) target.TextAlign = source.TextAlign;
+        if (!string.IsNullOrEmpty(source.TextAlign)) 
+        {target.TextAlign = source.TextAlign; GD.Print(source.TextAlign);}
         if (source.AutoMoveNext) target.AutoMoveNext = source.AutoMoveNext;
         if (source.AutoMoveNextDelay > 0) target.AutoMoveNextDelay = source.AutoMoveNextDelay;
         if (!source.AllowManualSkip) target.AllowManualSkip = false;
