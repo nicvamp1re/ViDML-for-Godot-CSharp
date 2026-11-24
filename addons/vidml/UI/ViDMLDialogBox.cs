@@ -131,7 +131,7 @@ public partial class ViDMLDialogBox : Control
     if (!string.IsNullOrEmpty(data.FontBi))
     {
         var fontRes = TextureLoader.LoadFontFromFile(data.FontBi);
-        if (fontRes != null) _textLabel.AddThemeFontOverride("bold_italics_font_size", fontRes);
+        if (fontRes != null) _textLabel.AddThemeFontOverride("bold_italics_font", fontRes);
     }
 
     // 5. Monospace Font & Size
